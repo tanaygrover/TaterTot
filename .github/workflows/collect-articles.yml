@@ -21,7 +21,7 @@ jobs:
     steps:
       # Step 1: Checkout code
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       
       # Step 2: Setup Python
       - name: Setup Python 3.10
@@ -63,7 +63,7 @@ jobs:
       # Step 7: Upload logs (for debugging)
       - name: Upload logs
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: pipeline-logs-${{ github.run_number }}
           path: backend/*.log
