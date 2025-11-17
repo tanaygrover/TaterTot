@@ -13,7 +13,17 @@ function Header({ pipelineStatus }) {
     <header className="bg-white shadow-sm border-b-2 border-[#b8860b]">
       <div className="w-full px-8 lg:px-16 py-4">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-[#b8860b] mb-1">
+          {/* Logo Image - Made bigger */}
+          <div className="mb-2">
+            <img 
+              src="/logo-white-bg.png" 
+              alt="Claire Adler Luxury PR" 
+              className="h-24 mx-auto"
+            />
+          </div>
+          
+          {/* TaterTot - Made smaller */}
+          <h1 className="text-xl font-bold text-[#b8860b] mb-1">
             TaterTot
           </h1>
           <p className="text-sm text-black font-medium mb-2">

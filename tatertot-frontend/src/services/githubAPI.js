@@ -136,6 +136,57 @@ async triggerPipeline() {
     
     return null;
   }
+    /**
+   * Get direct download link for latest artifact
+   */
+  async getLatestArtifactDownloadURL() {
+    try {
+      const runs = await this.getWorkflowRuns(5);
+      
+      // Find latest successful run
+      const successfulRun = runs.find(run => 
+        run.conclusion === 'success' &&
+        run.name === 'Collect & Summarize Articles'
+      );
+      
+      if (!successfulRun) {
+        console.log('No successful runs found');
+        return null;
+      }
+      
+      // Get artifacts for this run
+      const artifactsURL = `${this.baseURL}/actions/runs/${successfulRun.id}/artifacts`;
+      
+      const headers = {
+        'Accept': 'application/vnd.github+json',
+      };
+      
+      if (GITHUB_TOKEN) {
+        headers['Authorization'] = `Bearer ${GITHUB_TOKEN}`;
+      }
+      
+      const response = await fetch(artifactsURL, { headers });
+      const data = await response.json();
+      
+      // Find roundup artifact
+      const artifact = data.artifacts?.find(a => a.name.startsWith('roundup-files-'));
+      
+      if (artifact) {
+        return {
+          downloadURL: artifact.archive_download_url,
+          name: artifact.name,
+          runNumber: successfulRun.run_number,
+          createdAt: artifact.created_at
+        };
+      }
+      
+      return null;
+      
+    } catch (error) {
+      console.error('Error getting artifact:', error);
+      return null;
+    }
+  }
 }
 
 export default new GitHubService();

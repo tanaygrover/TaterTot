@@ -17,20 +17,20 @@ function SummariesView() {
   }, []);
 
   const checkForPDF = async () => {
-  try {
-    // Get latest run info from Sheets
-    const runInfo = await googleSheetsAPI.getLatestRunInfo();
-    if (runInfo) {
-      setPdfLink({
-        runNumber: runInfo.runNumber,
-        runUrl: runInfo.runUrl,
-        artifactName: `roundup-files-${runInfo.runNumber}`
-      });
+    try {
+      // Get latest run info from Sheets
+      const runInfo = await googleSheetsAPI.getLatestRunInfo();
+      if (runInfo) {
+        setPdfLink({
+          runNumber: runInfo.runNumber,
+          runUrl: runInfo.runUrl,
+          artifactName: `roundup-files-${runInfo.runNumber}`
+        });
+      }
+    } catch (error) {
+      console.error('Error checking for PDF:', error);
     }
-  } catch (error) {
-    console.error('Error checking for PDF:', error);
-  }
-};
+  };
 
   const handleRunPipeline = async () => {
     // Confirmation popup
@@ -96,9 +96,16 @@ function SummariesView() {
         const mostRecent = new Date(Math.max(...dates));
         setLastRunTime(mostRecent);
         
-        const pdfInfo = await googleSheetsAPI.getLatestPDFLink();
-        if (pdfInfo) {
-          setPdfLink(pdfInfo);
+        // Get latest run info (which has artifact)
+        const runInfo = await googleSheetsAPI.getLatestRunInfo();
+        if (runInfo) {
+          setPdfLink({
+            runNumber: runInfo.runNumber,
+            runUrl: runInfo.runUrl
+          });
+        } else {
+          // Fallback: assume latest run has PDF
+          setPdfLink({ available: true });
         }
         
         setPipelineStatus('complete');
@@ -124,21 +131,84 @@ function SummariesView() {
     await loadResultsAfterPipeline();
   };
 
-  const handleDownloadPDF = () => {
-  if (pdfLink && pdfLink.runUrl) {
-    // Open the GitHub Actions run page where user can download artifacts
-    alert(
-      '📄 PDF Download Instructions:\n\n' +
-      '1. A new tab will open with the workflow run\n' +
-      '2. Scroll down to "Artifacts" section\n' +
-      '3. Click on "roundup-files-' + pdfLink.runNumber + '" to download\n' +
-      '4. Unzip the file to access the PDF'
-    );
-    window.open(pdfLink.runUrl, '_blank');
-  } else {
-    alert('No PDF available yet. Run the pipeline first to generate a PDF.');
-  }
-};
+  const handleDownloadPDF = async () => {
+    // Show loading state
+    const downloadButton = document.activeElement;
+    const originalText = downloadButton?.innerText;
+    if (downloadButton) { 
+      downloadButton.innerText = 'Downloading...';
+      downloadButton.disabled = true;
+    }
+    
+    try {
+      // Get artifact download URL
+      const artifactInfo = await githubAPI.getLatestArtifactDownloadURL();
+      
+      if (artifactInfo && artifactInfo.downloadURL) {
+        // For authenticated download, we need the token
+        const token = import.meta.env.VITE_GITHUB_TOKEN;
+        
+        if (token) {
+          // Download with authentication
+          const response = await fetch(artifactInfo.downloadURL, {
+            headers: {
+              'Accept': 'application/vnd.github+json',
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          
+          if (response.ok) {
+            // Convert to blob and trigger download
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${artifactInfo.name}.zip`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            
+            alert('✅ Download started!\n\nThe file is a ZIP archive.\nExtract it to access the PDF.');
+          } else {
+            throw new Error('Download failed');
+          }
+        } else {
+          // No token - open GitHub page
+          alert(
+            '📄 PDF Download:\n\n' +
+            'Opening GitHub Actions page.\n' +
+            'Download the artifact to get your PDF.'
+          );
+          
+          const githubOwner = import.meta.env.VITE_GITHUB_OWNER;
+          const githubRepo = import.meta.env.VITE_GITHUB_REPO;
+          window.open(
+            `https://github.com/${githubOwner}/${githubRepo}/actions`,
+            '_blank'
+          );
+        }
+      } else {
+        alert('No PDF available. Run the pipeline first!');
+      }
+    } catch (error) {
+      console.error('Download error:', error);
+      alert('Failed to download PDF. Opening GitHub Actions page instead.');
+      
+      const githubOwner = import.meta.env.VITE_GITHUB_OWNER;
+      const githubRepo = import.meta.env.VITE_GITHUB_REPO;
+      window.open(
+        `https://github.com/${githubOwner}/${githubRepo}/actions`,
+        '_blank'
+      );
+    } finally {
+      // Reset button
+      if (downloadButton) {
+        downloadButton.innerText = originalText;
+        downloadButton.disabled = false;
+      }
+    }
+  };
 
   // LANDING PAGE
   if (pipelineStatus === 'idle') {
@@ -146,8 +216,12 @@ function SummariesView() {
       <div className="max-w-7xl mx-auto">
         {/* Hero Section */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[#faf8f3] mb-4 border-2 border-[#b8860b]">
-            <img src="/logo.svg" alt="TaterTot Logo" className="w-10 h-10" />
+          <div className="inline-flex items-center justify-center w-20 h-20 mb-4">
+            <img 
+              src="/ca-circle.png" 
+              alt="CA Logo" 
+              className="w-20 h-20"
+            />
           </div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">
             Article Pipeline Ready
@@ -190,7 +264,7 @@ function SummariesView() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <div className="bg-white p-4 rounded-lg shadow-lg border-2 border-gray-200 hover:border-[#b8860b] transition-colors">
             <div className="flex items-center gap-2 mb-1">
-              <img src="/logo.svg" alt="" className="w-4 h-4" />
+              <FileText className="w-4 h-4 text-[#b8860b]" />
               <span className="text-xs font-semibold text-gray-600">Publications</span>
             </div>
             <p className="text-xl font-bold text-gray-900">40</p>
@@ -201,7 +275,7 @@ function SummariesView() {
               <Clock className="w-4 h-4 text-[#b8860b]" />
               <span className="text-xs font-semibold text-gray-600">Avg. Runtime</span>
             </div>
-            <p className="text-xl font-bold text-gray-900">~3 min</p>
+            <p className="text-xl font-bold text-gray-900">~15 min</p>
           </div>
 
           <div className="bg-white p-4 rounded-lg shadow-lg border-2 border-gray-200 hover:border-[#b8860b] transition-colors">
