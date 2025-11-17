@@ -19,7 +19,11 @@ service-account.json
 !backend/config/*.json
 !frontend/package*.json
 !frontend/tsconfig*.json
+!frontend/vite.config.js
+!frontend/eslint.config.js
 .env
+.env.local
+.env.*.local
 *.key
 *.pem
 
@@ -27,8 +31,12 @@ service-account.json
 backend/output/
 backend/*.txt
 backend/*.pdf
+backend/*.json
+!backend/config/*.json
 backend/logs/
 backend/data/
+backend/biweekly_roundup_*
+backend/collected_articles.json
 
 # Node/React (Frontend)
 node_modules/
@@ -70,3 +78,6 @@ htmlcov/
 *.tmp
 *.temp
 .temp/
+
+# GitHub Actions artifacts
+*.zip

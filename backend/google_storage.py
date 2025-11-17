@@ -9,6 +9,9 @@ from datetime import datetime
 import json
 import os
 
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaFileUpload
+
 
 class GoogleSheetsDB:
     """
@@ -23,10 +26,11 @@ class GoogleSheetsDB:
             credentials_path: Path to service account JSON file
             sheet_id: Google Sheet ID (from URL)
         """
-        # Define scopes
+        # Define scopes (add Drive scope!)
         scope = [
             'https://www.googleapis.com/auth/spreadsheets',
-            'https://www.googleapis.com/auth/drive'
+            'https://www.googleapis.com/auth/drive',
+            'https://www.googleapis.com/auth/drive.file'
         ]
         
         # Load credentials
@@ -47,6 +51,9 @@ class GoogleSheetsDB:
                 )
             else:
                 raise ValueError("No credentials found. Set GOOGLE_CREDENTIALS env variable or provide credentials.json")
+        
+        # STORE credentials for later use with Drive API
+        self._credentials = creds
         
         # Authorize and get client
         self.client = gspread.authorize(creds)
@@ -193,6 +200,165 @@ class GoogleSheetsDB:
         except Exception as e:
             print(f"❌ Error retrieving pitching menu: {str(e)}")
             return []
+        
+    def upload_pdf_to_drive(self, pdf_path, target_folder_id=None):
+        """
+        Upload PDF to a shared Google Drive folder
+        
+        Args:
+            pdf_path: Path to the PDF file
+            target_folder_id: ID of the shared Drive folder (optional)
+            
+        Returns:
+            (download_link, view_link) tuple
+        """
+        try:
+            from googleapiclient.discovery import build
+            from googleapiclient.http import MediaFileUpload
+            
+            # Build Drive service with stored credentials
+            drive_service = build('drive', 'v3', credentials=self._credentials)
+            
+            # Use provided folder ID or environment variable
+            folder_id = target_folder_id or os.getenv('GOOGLE_DRIVE_FOLDER_ID')
+            
+            if not folder_id:
+                print("⚠️  No Drive folder ID provided. Upload skipped.")
+                print("Set GOOGLE_DRIVE_FOLDER_ID environment variable")
+                return None, None
+            
+            # Check if file exists
+            if not os.path.exists(pdf_path):
+                print(f"❌ PDF file not found: {pdf_path}")
+                return None, None
+            
+            print(f"📤 Uploading {os.path.basename(pdf_path)} to Google Drive...")
+            
+            # Upload PDF to the specific folder
+            file_metadata = {
+                'name': os.path.basename(pdf_path),
+                'parents': [folder_id]  # Upload to shared folder
+            }
+            
+            media = MediaFileUpload(pdf_path, mimetype='application/pdf', resumable=True)
+            
+            file = drive_service.files().create(
+                body=file_metadata,
+                media_body=media,
+                fields='id, webViewLink, webContentLink'
+            ).execute()
+            
+            print(f"✅ File uploaded with ID: {file['id']}")
+            
+            # Make file publicly accessible (anyone with link can view)
+            print("🔓 Setting public access...")
+            drive_service.permissions().create(
+                fileId=file['id'],
+                body={
+                    'type': 'anyone',
+                    'role': 'reader'
+                },
+                fields='id'
+            ).execute()
+            
+            # Get shareable links
+            # For direct download, we need to modify the link
+            file_id = file['id']
+            download_link = f"https://drive.google.com/uc?export=download&id={file_id}"
+            view_link = file.get('webViewLink')
+            
+            print(f"✅ PDF uploaded to Google Drive")
+            print(f"   View: {view_link}")
+            print(f"   Download: {download_link}")
+            
+            return download_link, view_link
+            
+        except Exception as e:
+            print(f"❌ Error uploading PDF to Drive: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return None, None
+
+def _get_or_create_drive_folder(self, drive_service, folder_name):
+    """
+    This method is no longer needed - we use a pre-created shared folder
+    Keeping for backwards compatibility
+    """
+    print(f"⚠️  Using pre-shared folder instead of creating new one")
+    return None
+        
+    def _get_or_create_drive_folder(self, drive_service, folder_name):
+        """
+        Get existing folder or create new one in Google Drive
+        """
+        # Search for existing folder
+        query = f"name='{folder_name}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
+        results = drive_service.files().list(
+            q=query,
+            spaces='drive',
+            fields='files(id, name)'
+        ).execute()
+        
+        folders = results.get('files', [])
+        
+        if folders:
+            return folders[0]['id']
+        
+        # Create new folder
+        file_metadata = {
+            'name': folder_name,
+            'mimeType': 'application/vnd.google-apps.folder'
+        }
+        
+        folder = drive_service.files().create(
+            body=file_metadata,
+            fields='id'
+        ).execute()
+        
+        print(f"✅ Created Google Drive folder: {folder_name}")
+        return folder['id']
+    
+    def save_pdf_link(self, pdf_download_link, pdf_view_link):
+        """
+        Save PDF link to a special 'Metadata' sheet for frontend to access
+        """
+        try:
+            # Get or create Metadata sheet
+            try:
+                metadata_sheet = self.spreadsheet.worksheet('Metadata')
+            except:
+                metadata_sheet = self.spreadsheet.add_worksheet(
+                    title='Metadata',
+                    rows=10,
+                    cols=3
+                )
+                # Add headers
+                metadata_sheet.update('A1:C1', [['Key', 'Value', 'Updated']])
+            
+            # Update or add PDF link
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            
+            # Try to find existing "latest_pdf" row
+            try:
+                cell = metadata_sheet.find('latest_pdf')
+                row_num = cell.row
+                metadata_sheet.update(f'B{row_num}:C{row_num}', [[pdf_download_link, timestamp]])
+            except:
+                # Add new row
+                metadata_sheet.append_row(['latest_pdf', pdf_download_link, timestamp])
+            
+            # Also add view link
+            try:
+                cell = metadata_sheet.find('latest_pdf_view')
+                row_num = cell.row
+                metadata_sheet.update(f'B{row_num}:C{row_num}', [[pdf_view_link, timestamp]])
+            except:
+                metadata_sheet.append_row(['latest_pdf_view', pdf_view_link, timestamp])
+            
+            print(f"✅ PDF link saved to Metadata sheet")
+            
+        except Exception as e:
+            print(f"⚠️ Error saving PDF link to metadata: {str(e)}")
     
     def update_draft_status(self, draft_id, approved=True):
         """

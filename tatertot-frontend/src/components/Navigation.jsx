@@ -6,7 +6,7 @@ function Navigation({ activeTab, setActiveTab }) {
   ];
 
   return (
-    <nav className="bg-white border-b border-gray-200">
+    <nav className="bg-white border-b-2 border-gray-200">
       <div className="w-full px-8 lg:px-16">
         <div className="flex space-x-8">
           {tabs.map((tab) => {

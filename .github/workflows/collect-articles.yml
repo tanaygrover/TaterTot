@@ -1,11 +1,10 @@
 name: Collect & Summarize Articles
 
 on:
-  # Only manual trigger - no automatic schedule
   workflow_dispatch:
     inputs:
       test_mode:
-        description: 'Run in test mode (limited publications)'
+        description: 'Run in test mode'
         required: false
         default: 'false'
         type: choice
@@ -19,52 +18,57 @@ jobs:
     timeout-minutes: 60
     
     steps:
-      # Step 1: Checkout code
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
       
-      # Step 2: Setup Python
       - name: Setup Python 3.10
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
           cache: 'pip'
       
-      # Step 3: Install dependencies
       - name: Install Python dependencies
         run: |
           cd backend
           pip install -r requirements.txt
       
-      # Step 4: Setup Google Credentials
       - name: Setup Google Service Account
         run: |
           cd backend
           echo '${{ secrets.GOOGLE_CREDENTIALS }}' > credentials.json
-        env:
-          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
       
-      # Step 5: Run the pipeline
       - name: Run Article Collection Pipeline
         run: |
           cd backend
           python pipeline_runner.py
         env:
           GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
+          GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
           TEST_MODE: ${{ github.event.inputs.test_mode }}
       
-      # Step 6: Cleanup credentials (security)
+      - name: Check output files
+        if: always()
+        run: |
+          echo "=== Checking for output files ==="
+          ls -la backend/output/ || echo "No output directory"
+          echo ""
+          echo "=== PDF files ==="
+          find backend -name "*.pdf" || echo "No PDF files found"
+          echo ""
+          echo "=== JSON files ==="
+          find backend/output -name "*.json" || echo "No JSON files found"
+      
+      - name: Upload Output Files as Artifacts
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: roundup-files-${{ github.run_number }}
+          path: backend/output/
+          if-no-files-found: warn
+          retention-days: 30
+      
       - name: Cleanup credentials
         if: always()
         run: |
           cd backend
           rm -f credentials.json
-      
-      # Step 7: Upload logs (for debugging)
-      - name: Upload logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: pipeline-logs-${{ github.run_number }}
-          path: backend/*.log
-          retention-days: 7
