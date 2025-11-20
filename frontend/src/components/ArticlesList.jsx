@@ -4,7 +4,7 @@ import { formatDistanceToNow } from 'date-fns';
 function ArticlesList({ articles, onRunAgain, lastRunTime, onDownloadPDF, hasPDF }) {
   return (
     <div className="w-full h-full flex flex-col">
-      {/* Header with Run Again button */}
+      {/* Header with Home button */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
         <div>
           <h2 className="text-3xl font-bold text-gray-900">
@@ -31,7 +31,7 @@ function ArticlesList({ articles, onRunAgain, lastRunTime, onDownloadPDF, hasPDF
             className="inline-flex items-center gap-2 px-6 py-3 bg-[#b8860b] text-black font-semibold rounded-lg hover:bg-[#8b6914] transition-colors shadow-md hover:shadow-lg"
           >
             <RefreshCw className="w-5 h-5" />
-            Run Again
+            Home
           </button>
         </div>
       </div>
@@ -58,7 +58,8 @@ function ArticlesList({ articles, onRunAgain, lastRunTime, onDownloadPDF, hasPDF
           >
             {/* Article Header */}
             <div className="mb-4">
-              <h3 className="text-lg font-semibold text-gray-900 mb-3 line-clamp-2">
+              {/* Full title - no truncation */}
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">
                 {article.title}
               </h3>
               
@@ -78,8 +79,8 @@ function ArticlesList({ articles, onRunAgain, lastRunTime, onDownloadPDF, hasPDF
               </div>
             </div>
 
-            {/* Summary */}
-            <p className="text-gray-700 mb-4 leading-relaxed flex-grow line-clamp-4">
+            {/* Full Summary - no truncation */}
+            <p className="text-gray-700 mb-4 leading-relaxed flex-grow">
               {article.summary}
             </p>
 

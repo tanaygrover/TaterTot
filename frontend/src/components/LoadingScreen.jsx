@@ -53,7 +53,7 @@ function LoadingScreen() {
           Pipeline Running
         </h2>
         <p className="text-base text-gray-600 mb-6">
-          This usually takes 2-3 minutes...
+          This usually takes 8-10 minutes...
         </p>
 
         {/* Progress Bar */}

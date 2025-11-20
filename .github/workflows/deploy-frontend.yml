@@ -43,6 +43,7 @@ jobs:
           VITE_GITHUB_OWNER: ${{ github.repository_owner }}
           VITE_GITHUB_REPO: ${{ github.event.repository.name }}
           VITE_GITHUB_TOKEN: ${{ secrets.GH_WORKFLOW_TOKEN }}
+          VITE_PASSWORD_HASH: ${{ secrets.VITE_PASSWORD_HASH }}
       
       - name: Setup Pages
         uses: actions/configure-pages@v4
