@@ -20,12 +20,13 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       
       - name: Setup Python 3.10
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
-          cache: 'pip'
       
       - name: Install Python dependencies
         run: |
@@ -43,29 +44,31 @@ jobs:
           python pipeline_runner.py
         env:
           GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
-          GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
           TEST_MODE: ${{ github.event.inputs.test_mode }}
       
-      - name: Check output files
-        if: always()
+      - name: Find PDF and Get Date
+        id: find-pdf
         run: |
-          echo "=== Checking for output files ==="
-          ls -la backend/output/ || echo "No output directory"
-          echo ""
-          echo "=== PDF files ==="
-          find backend -name "*.pdf" || echo "No PDF files found"
-          echo ""
-          echo "=== JSON files ==="
-          find backend/output -name "*.json" || echo "No JSON files found"
+          PDF_FILE=$(find backend/output -name "*.pdf" -type f | head -n 1)
+          if [ -z "$PDF_FILE" ]; then
+            echo "❌ No PDF found"
+            exit 1
+          fi
+          echo "pdf_path=$PDF_FILE" >> $GITHUB_OUTPUT
+          echo "✅ Found PDF: $PDF_FILE"
+          
+          # Get current date for artifact naming
+          CURRENT_DATE=$(date +%Y-%m-%d)
+          echo "current_date=$CURRENT_DATE" >> $GITHUB_OUTPUT
+          echo "📅 Using date: $CURRENT_DATE"
       
-      - name: Upload Output Files as Artifacts
-        if: always()
+      - name: Upload PDF as Direct Download
+        if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: roundup-files-${{ github.run_number }}
-          path: backend/output/
-          if-no-files-found: warn
-          retention-days: 30
+          name: Reading-Roundup-${{ steps.find-pdf.outputs.current_date }}.pdf
+          path: ${{ steps.find-pdf.outputs.pdf_path }}
+          retention-days: 90
       
       - name: Cleanup credentials
         if: always()

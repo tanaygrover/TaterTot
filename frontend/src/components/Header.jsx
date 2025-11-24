@@ -38,12 +38,9 @@ function Header({ pipelineStatus }) {
               />
             </div>
             
-            {/* TaterTot */}
-            <h1 className="text-xl font-bold text-[#b8860b] mb-1">
-              TaterTot
-            </h1>
+            {/* Reading Roundup Dashboard */}
             <p className="text-sm text-black font-medium mb-2">
-              A Reading Roundup Dashboard
+              Reading Roundup Dashboard
             </p>
             
             {/* Status */}

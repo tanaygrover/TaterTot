@@ -603,13 +603,15 @@ class CustomArticleCollector:
             
             candidate.relevance_score = full_score
             candidate.keywords_found = full_keywords
-            
+
+            ''' Author extraction disabled from Collector - now in Summarizer
             if article.authors:
                 candidate.author = article.authors[0]
             else:
                 author_match = re.search(r'\b[Bb]y\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)', article.text[:800])
                 if author_match:
                     candidate.author = author_match.group(1)
+            '''
             
             if article.meta_description and len(article.meta_description) > len(candidate.summary):
                 candidate.summary = article.meta_description
