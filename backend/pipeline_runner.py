@@ -68,9 +68,11 @@ class PipelineRunner:
             
             print(f"\n✅ Collected {len(articles)} total articles")
             
-            # Convert to dictionaries - NO AUTHOR YET
+            # Convert to dictionaries - Author already handled in Collector
             articles_data = []
             for idx, article in enumerate(articles):
+                author = article.author if hasattr(article, 'author') and article.author else 'Unknown'
+
                 article_dict = {
                     'id': f"article-{datetime.now().strftime('%Y%m%d')}-{idx+1}",
                     'title': article.title,
@@ -78,7 +80,7 @@ class PipelineRunner:
                     'publication': article.publication,
                     'full_content': article.full_content,  # Keep for summarization
                     'journalist': 'Unknown',  # Placeholder
-                    'author': 'Unknown',      # Placeholder
+                    'author': author,      # Placeholder
                     'summary': '',            # Will be filled by summarizer
                 }
                 articles_data.append(article_dict)

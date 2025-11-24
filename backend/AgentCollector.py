@@ -11,7 +11,7 @@ import json
 from bs4 import BeautifulSoup
 import xml.etree.ElementTree as ET
 import random
-
+from AgentSumm import extract_author
 # Try to import cloudscraper for CloudFlare bypass
 try:
     import cloudscraper
@@ -47,7 +47,9 @@ class CustomArticleCollector:
             'graff', 'harry winston', 'chopard', 'piaget', 'boucheron',
             'red carpet', 'celebrity', 'haute couture', 'collection',
             'launch', 'collaboration', 'limited edition', 'auction',
-            'investment', 'trends', 'style', 'fashion week', 'royal', 'royals'
+            'investment', 'trends', 'style', 'fashion week', 'royal', 'royals',
+            'Luxury sector', 'Luxury marketing trends', 'Lab grown diamonds',
+             'Diamond price', 'Gold price'
         ]
         
         # Your specific publication sources
@@ -604,14 +606,10 @@ class CustomArticleCollector:
             candidate.relevance_score = full_score
             candidate.keywords_found = full_keywords
 
-            ''' Author extraction disabled from Collector - now in Summarizer
-            if article.authors:
-                candidate.author = article.authors[0]
-            else:
-                author_match = re.search(r'\b[Bb]y\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)', article.text[:800])
-                if author_match:
-                    candidate.author = author_match.group(1)
-            '''
+            ### Using extract_author from AgentSumm.py ###
+             # Extract author using AgentSumm's better function
+            candidate.author = extract_author(article, article.text)
+
             
             if article.meta_description and len(article.meta_description) > len(candidate.summary):
                 candidate.summary = article.meta_description

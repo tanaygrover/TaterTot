@@ -134,32 +134,35 @@ function SummariesView() {
 
   const handleDownloadPDF = async () => {
     // Show loading state
-    const downloadButton = document.activeElement;
-    const originalText = downloadButton?.innerText;
-    if (downloadButton) { 
-      downloadButton.innerText = 'Downloading...';
-      downloadButton.disabled = true;
-    }
+    console.log('Starting PDF download...');
     
     try {
-      // Get artifact download URL
+      // Get the latest artifact download URL from GitHub API
       const artifactInfo = await githubAPI.getLatestArtifactDownloadURL();
       
-      if (artifactInfo && artifactInfo.downloadURL) {
-        // For authenticated download, we need the token
-        const token = import.meta.env.VITE_GITHUB_TOKEN;
-        
-        if (token) {
-          // Download with authentication
+      if (!artifactInfo || !artifactInfo.downloadURL) {
+        alert('No PDF available yet. Run the pipeline first to generate a PDF.');
+        return;
+      }
+      
+      console.log('Artifact found:', artifactInfo);
+      
+      // For GitHub artifacts, authentication is required
+      const token = import.meta.env.VITE_GITHUB_TOKEN;
+      
+      if (token) {
+        // Try to download with authentication
+        try {
           const response = await fetch(artifactInfo.downloadURL, {
             headers: {
               'Accept': 'application/vnd.github+json',
-              'Authorization': `Bearer ${token}`
+              'Authorization': `Bearer ${token}`,
+              'X-GitHub-Api-Version': '2022-11-28'
             }
           });
           
           if (response.ok) {
-            // Convert to blob and trigger download
+            // Get the blob and trigger download
             const blob = await response.blob();
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -172,28 +175,20 @@ function SummariesView() {
             
             alert('✅ Download started!\n\nThe file is a ZIP archive.\nExtract it to access the PDF.');
           } else {
-            throw new Error('Download failed');
+            throw new Error(`Download failed: ${response.status}`);
           }
-        } else {
-          // No token - open GitHub page
-          alert(
-            '📄 PDF Download:\n\n' +
-            'Opening GitHub Actions page.\n' +
-            'Download the artifact to get your PDF.'
-          );
-          
-          const githubOwner = import.meta.env.VITE_GITHUB_OWNER;
-          const githubRepo = import.meta.env.VITE_GITHUB_REPO;
-          window.open(
-            `https://github.com/${githubOwner}/${githubRepo}/actions`,
-            '_blank'
-          );
+        } catch (fetchError) {
+          console.error('Direct download failed:', fetchError);
+          // Fallback to GitHub page
+          openGitHubArtifactPage(artifactInfo);
         }
       } else {
-        alert('No PDF available. Run the pipeline first!');
+        // No token - must open GitHub page
+        openGitHubArtifactPage(artifactInfo);
       }
+      
     } catch (error) {
-      console.error('Download error:', error);
+      console.error('Error downloading PDF:', error);
       alert('Failed to download PDF. Opening GitHub Actions page instead.');
       
       const githubOwner = import.meta.env.VITE_GITHUB_OWNER;
@@ -202,15 +197,24 @@ function SummariesView() {
         `https://github.com/${githubOwner}/${githubRepo}/actions`,
         '_blank'
       );
-    } finally {
-      // Reset button
-      if (downloadButton) {
-        downloadButton.innerText = originalText;
-        downloadButton.disabled = false;
-      }
     }
   };
 
+  const openGitHubArtifactPage = (artifactInfo) => {
+    alert(
+      '📄 PDF Download:\n\n' +
+      'Opening GitHub to download the artifact.\n\n' +
+      `Artifact: ${artifactInfo.name}\n` +
+      'Click the artifact to download, then extract the ZIP to get your PDF.'
+    );
+    
+    const githubOwner = import.meta.env.VITE_GITHUB_OWNER;
+    const githubRepo = import.meta.env.VITE_GITHUB_REPO;
+    window.open(
+      `https://github.com/${githubOwner}/${githubRepo}/actions`,
+      '_blank'
+    );
+  };
   // LANDING PAGE
   if (pipelineStatus === 'idle') {
     return (

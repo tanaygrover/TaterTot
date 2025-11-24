@@ -168,8 +168,8 @@ async triggerPipeline() {
       const response = await fetch(artifactsURL, { headers });
       const data = await response.json();
       
-      // Find roundup artifact
-      const artifact = data.artifacts?.find(a => a.name.startsWith('roundup-files-'));
+      // Find the Reading Roundup artifact
+      const artifact = data.artifacts?.find(a => a.name.startsWith('Reading-Roundup-'));
       
       if (artifact) {
         return {
@@ -187,6 +187,7 @@ async triggerPipeline() {
       return null;
     }
   }
+
 }
 
 export default new GitHubService();
