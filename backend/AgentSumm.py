@@ -67,21 +67,22 @@ class ArticleSummarizer:
     ) -> Optional[ArticleSummary]:
         """Summarize an article focusing on luxury brands, jewelry pieces, and celebrities"""
         try:
-            input_text = (
-                "You are a PR professional specializing in luxury brands, jewelry, and fashion. "
-                "Summarize only the key details of the article, focusing on jewelry pieces, collections, luxury brands, and celebrity names. "
-                "Include all important facts, figures, numbers, dates, and numeric comparisons relevant to these mentions. "
-                "Avoid unnecessary explanations or background - only include details that a luxury PR expert would need to know to quickly understand the article. "
-                "Keep sentences short, clear, and easy to read, so that the summary can save time and fully convey the essential points of the article. "
-            + article_content
-            )
+            # BART-CNN doesn't use prompts - just give it the article content
+            # Adding a prompt causes hallucinations!
+            
+            # Just use the article content directly
+            input_text = article_content[:4000]  # Use more context
             
             summary_text = self.summarizer(
-            input_text[:4000],  # Increased from 3000 to allow more context
-            max_length=250,      # Increased from 120 to allow longer summaries
-            min_length=80,       # Increased from 40 to ensure detail
-            do_sample=False
-        )[0]["summary_text"]
+                input_text,
+                max_length=300,      # Longer summaries for more detail
+                min_length=120,      # Ensure substantial detail
+                do_sample=False,     # Deterministic output
+                truncation=True,
+                num_beams=6,         # Higher beam search for quality
+                length_penalty=1.0,  # No penalty for length
+                early_stopping=True
+            )[0]["summary_text"]
 
             return ArticleSummary(
                 title=title,
@@ -95,7 +96,6 @@ class ArticleSummarizer:
         except Exception as e:
             print(f"Error summarizing article {article_url}: {e}")
             return None
-
 
 def extract_publication_name(url: str) -> str:
     domain = urlparse(url).netloc.replace("www.", "").split(".")[0]
