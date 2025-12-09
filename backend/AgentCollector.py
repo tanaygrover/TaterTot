@@ -12,7 +12,16 @@ from bs4 import BeautifulSoup
 import xml.etree.ElementTree as ET
 import random
 from AgentSumm import extract_author
-# Try to import cloudscraper for CloudFlare bypass
+
+# Try to import curl-cffi (most powerful anti-blocking)
+try:
+    from curl_cffi import requests as curl_requests
+    CURL_CFFI_AVAILABLE = True
+except ImportError:
+    CURL_CFFI_AVAILABLE = False
+    print("Note: Install curl-cffi for best anti-blocking: pip install curl-cffi")
+
+# Try to import cloudscraper (fallback)
 try:
     import cloudscraper
     CLOUDSCRAPER_AVAILABLE = True
@@ -49,142 +58,198 @@ class CustomArticleCollector:
             'launch', 'collaboration', 'limited edition', 'auction',
             'investment', 'trends', 'style', 'fashion week', 'royal', 'royals',
             'Luxury sector', 'Luxury marketing trends', 'Lab grown diamonds',
-             'Diamond price', 'Gold price'
+            'Diamond price', 'Gold price'
         ]
         
-        # Your specific publication sources
+        # Your specific publication sources - MULTIPLE RSS FEEDS SUPPORTED
         self.target_sources = {
             'The Guardian': {
                 'base_url': 'https://www.theguardian.com/fashion/womens-jewellery',
-                'rss_feed': 'https://www.theguardian.com/fashion/womens-jewellery/rss',
+                'rss_feeds': [
+                    'https://www.theguardian.com/fashion/womens-jewellery/rss'
+                ],
                 'sitemap_url': 'https://www.theguardian.com/sitemaps/news.xml'
             },
             'The Telegraph': {
                 'base_url': 'https://www.telegraph.co.uk/luxury/',
-                'rss_feed': 'https://www.telegraph.co.uk/luxury/rss',
+                'rss_feeds': [
+                    'https://www.telegraph.co.uk/luxury/rss'
+                ],
                 'sitemap_url': 'https://www.telegraph.co.uk/luxury/sitemap.xml'
             },
             'Evening Standard': {
                 'base_url': 'https://www.standard.co.uk/topic/jewellery',
-                'rss_feed': 'https://www.standard.co.uk/rss',
+                'rss_feeds': [
+                    'https://www.standard.co.uk/rss'
+                ],
                 'sitemap_url': 'https://www.standard.co.uk/sitemaps/googlenews'
             },
             'The Times': {
                 'base_url': 'https://www.thetimes.com/life-style/luxury',
-                'rss_feed': None,
+                'rss_feeds': [],
                 'sitemap_url': 'https://www.thetimes.com/sitemaps/news'
             },
             'Financial Times': {
                 'base_url': 'https://www.ft.com/fashion',
-                'rss_feed': None,
+                'rss_feeds': [],
                 'sitemap_url': 'https://www.forbes.com/news_sitemap.xml'
             },
             'Forbes': {
                 'base_url': 'https://www.forbes.com/business/',
-                'rss_feed': 'https://www.forbes.com/business/feed/',
+                'rss_feeds': [
+                    'https://www.forbes.com/business/feed/'
+                ],
                 'sitemap_url': 'https://www.forbes.com/news_sitemap.xml'
             },
             'Business of Fashion': {
                 'base_url': 'https://www.businessoffashion.com/',
-                'rss_feed': 'https://www.businessoffashion.com/feed/',
+                'rss_feeds': [
+                    'https://www.businessoffashion.com/feed/'
+                ],
                 'sitemap_url': 'https://www.businessoffashion.com/arc/outboundfeeds/sitemap/google-news/'
             },
             'Vogue Business': {
                 'base_url': 'https://www.voguebusiness.com/',
-                'rss_feed': 'https://www.voguebusiness.com/feed',
+                'rss_feeds': [
+                    'https://www.voguebusiness.com/feed'
+                ],
                 'sitemap_url': 'https://www.vogue.com/feed/google-latest-news/sitemap-google-news'
             },
             'Harper\'s Bazaar': {
                 'base_url': 'https://www.harpersbazaar.com/',
-                'rss_feed': None,
-                'sitemap_url': 'https://www.harpersbazaar.com/sitemap_index.xml'
+                'rss_feeds': [],
+                'sitemap_url': 'https://www.harpersbazaar.com/sitemap_google_news.xml'
             },
             'Elle': {
                 'base_url': 'https://www.elle.com/jewelry/',
-                'rss_feed': None,
+                'rss_feeds': [],
                 'sitemap_url': 'https://www.elle.com/sitemap_google_news.xml'
             },
             'Vogue UK': {
                 'base_url': 'https://www.vogue.co.uk/',
-                'rss_feed': 'https://www.vogue.co.uk/feed/rss',
+                'rss_feeds': [
+                    'https://www.vogue.co.uk/feed/rss'
+                ],
                 'sitemap_url': 'https://www.vogue.co.uk/feed/sitemap/sitemap-google-news'
             },
             'Vanity Fair': {
                 'base_url': 'https://www.vanityfair.com/',
-                'rss_feed': 'https://www.vanityfair.com/feed/rss',
+                'rss_feeds': [
+                    'https://www.vanityfair.com/feed/rss'
+                ],
                 'sitemap_url': 'https://www.vanityfair.com/feed/google-latest-news/sitemap-google-news'
             },
             'Tatler': {
                 'base_url': 'https://www.tatler.com/',
-                'rss_feed': None,
+                'rss_feeds': ['https://www.tatler.com/feed/rss'],
                 'sitemap_url': 'https://www.tatler.com/feed/google-latest-news/sitemap-google-news'
             },
             'Red Online': {
                 'base_url': 'https://www.redonline.co.uk/',
-                'rss_feed': None,
+                'rss_feeds': [],
                 'sitemap_url': 'https://www.redonline.co.uk/sitemap_google_news.xml'
             },
             'Town & Country': {
                 'base_url': 'https://www.townandcountrymag.com/style/',
-                'rss_feed': 'https://www.townandcountrymag.com/rss/all.xml/',
+                'rss_feeds': [
+                    'https://www.townandcountrymag.com/rss/all.xml/'
+                ],
                 'sitemap_url': 'https://www.townandcountrymag.com/sitemap_google_news.xml'
             },
             'StyleCaster': {
                 'base_url': 'https://stylecaster.com/c/fashion/',
-                'rss_feed': 'https://stylecaster.com/feed/',
+                'rss_feeds': [
+                    'https://stylecaster.com/feed/'
+                ],
                 'sitemap_url': 'https://stylecaster.com/news-sitemap.xml'
             },
             'The Handbook': {
                 'base_url': 'https://www.thehandbook.com/',
-                'rss_feed': None,
+                'rss_feeds': [],
                 'sitemap_url': 'https://www.thehandbook.com/sitemap.xml?postType=editorial&offset=0'
             },
             'Something About Rocks': {
                 'base_url': 'https://somethingaboutrocks.com/',
-                'rss_feed': 'https://somethingaboutrocks.com/feed/',
+                'rss_feeds': [
+                    'https://somethingaboutrocks.com/feed/'
+                ],
                 'sitemap_url': None
             },
             'The Cut': {
                 'base_url': 'https://www.thecut.com/',
-                'rss_feed': 'https://www.thecut.com/rss/index.xml',
+                'rss_feeds': [
+                    'https://www.thecut.com/rss/index.xml'
+                ],
                 'sitemap_url': 'https://www.thecut.com/sitemaps/sitemap-2025.xml'
             },
             'The Monocle': {
                 'base_url': 'https://monocle.com/',
-                'rss_feed': None,
+                'rss_feeds': [],
                 'sitemap_url': 'https://monocle.com/the-monocle-minute/'
             },
             'The Jewels Club': {
                 'base_url': 'https://thejewels.club/',
-                'rss_feed': None,
+                'rss_feeds': [],
                 'sitemap_url': 'https://thejewels.club/sitemap.xml'
             },
             'Retail Jeweller': {
                 'base_url': 'https://www.retail-jeweller.com/',
-                'rss_feed': 'https://www.retail-jeweller.com/feed/',
+                'rss_feeds': [
+                    'https://www.retail-jeweller.com/feed/'
+                ],
                 'sitemap_url': None
             },
             'Professional Jeweller': {
                 'base_url': 'https://www.professionaljeweller.com/',
-                'rss_feed': None,
+                'rss_feeds': ['https://www.professionaljeweller.com/feed/'],
                 'sitemap_url': None
             },
             'Rapaport': {
                 'base_url': 'https://rapaport.com/',
-                'rss_feed': 'https://rapaport.com/rss/',
+                'rss_feeds': [
+                    'https://rapaport.com/rss/'
+                ],
                 'sitemap_url': None
             },
             'National Jeweler': {
                 'base_url': 'https://nationaljeweler.com/',
-                'rss_feed': None,
+                'rss_feeds': [],
                 'sitemap_url': 'https://nationaljeweler.com/sitemap.xml'
+            },
+            'Wall Street Journal': {
+                'base_url': 'https://www.wsj.com/news/life-arts/fashion',
+                'rss_feeds': [
+                    'https://feeds.content.dowjones.io/public/rss/RSSWorldNews',
+                    'https://feeds.content.dowjones.io/public/rss/RSSLifestyle',
+                    'https://feeds.content.dowjones.io/public/rss/RSSArtsCulture',
+                    'https://feeds.content.dowjones.io/public/rss/RSSStyle'
+                ],
+                'sitemap_url': 'https://www.wsj.com/wsjsitemaps/wsj_google_news.xml'
+            },
+            'New York Times': {
+                'base_url': 'https://www.nytimes.com/',
+                'rss_feeds': [
+                    'https://rss.nytimes.com/services/xml/rss/nyt/World.xml',
+                    'https://rss.nytimes.com/services/xml/rss/nyt/Arts.xml',
+                    'https://rss.nytimes.com/services/xml/rss/nyt/FashionandStyle.xml'
+                ],
+                'sitemap_url': 'https://www.nytimes.com/sitemaps/new/news.xml.gz'
+            },
+            'Business Insider': {
+                'base_url': 'https://www.businessinsider.com/',
+                'rss_feeds': [],
+                'sitemap_url': 'https://www.businessinsider.com/sitemap/google-news.xml'
             }
         }
         
-        self.session = requests.Session()
-        
-        # Use CloudScraper if available
-        if CLOUDSCRAPER_AVAILABLE:
+        # Initialize scraper with priority order
+        if CURL_CFFI_AVAILABLE:
+            # curl-cffi is the most powerful - mimics real browsers perfectly
+            self.scraper = curl_requests.Session()
+            self.scraper_type = 'curl-cffi'
+            print("✅ curl-cffi enabled (most powerful anti-blocking)")
+            print("   Can bypass CloudFlare, SSL checks, and bot detection\n")
+        elif CLOUDSCRAPER_AVAILABLE:
             self.scraper = cloudscraper.create_scraper(
                 browser={
                     'browser': 'chrome',
@@ -192,9 +257,12 @@ class CustomArticleCollector:
                     'mobile': False
                 }
             )
-            print("CloudScraper enabled for anti-blocking\n")
+            self.scraper_type = 'cloudscraper'
+            print("✅ CloudScraper enabled for anti-blocking\n")
         else:
-            self.scraper = self.session
+            self.scraper = requests.Session()
+            self.scraper_type = 'requests'
+            print("⚠️  Using basic requests (limited anti-blocking)\n")
         
         # User-Agent rotation
         self.user_agents = [
@@ -237,6 +305,7 @@ class CustomArticleCollector:
             time.sleep(random.uniform(5, 10))
     
     def make_request(self, url: str, timeout: int = 10):
+        """Make HTTP request with curl-cffi for better anti-blocking"""
         self.apply_rate_limit()
         
         headers = {
@@ -245,23 +314,60 @@ class CustomArticleCollector:
             'Accept-Language': 'en-US,en;q=0.9',
             'Accept-Encoding': 'gzip, deflate, br',
             'Connection': 'keep-alive',
-            'Referer': 'https://www.google.com/'
+            'Referer': 'https://www.google.com/',
+            'Upgrade-Insecure-Requests': '1',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Cache-Control': 'max-age=0'
         }
         
         try:
-            response = self.scraper.get(url, headers=headers, timeout=timeout)
+            if self.scraper_type == 'curl-cffi':
+                # curl-cffi with browser impersonation (best for bypassing blocks)
+                response = self.scraper.get(
+                    url,
+                    headers=headers,
+                    timeout=timeout,
+                    impersonate="chrome110",  # Mimics Chrome 110 perfectly
+                    verify=True
+                )
+            else:
+                # Fallback to cloudscraper or requests
+                response = self.scraper.get(url, headers=headers, timeout=timeout)
             
             if response.status_code != 200:
                 domain = urlparse(url).netloc
                 if 'telegraph' in domain.lower():
                     print(f"    HTTP {response.status_code} - Telegraph blocking detected")
-                    print(f"    Response preview: {response.text[:200]}")
                 else:
                     print(f"    HTTP {response.status_code} error for {url}")
             
             return response
-        except requests.exceptions.RequestException as e:
-            print(f"    Request error: {str(e)}")
+            
+        except Exception as e:
+            error_msg = str(e)
+            
+            # Handle SSL errors specifically
+            if 'SSL' in error_msg or 'ssl' in error_msg.lower():
+                print(f"    SSL Error: {urlparse(url).netloc} is blocking with SSL handshake")
+                
+                # Try one more time without verification (curl-cffi only)
+                if self.scraper_type == 'curl-cffi':
+                    try:
+                        print(f"    Retrying without SSL verification...")
+                        response = self.scraper.get(
+                            url,
+                            headers=headers,
+                            timeout=timeout,
+                            impersonate="chrome110",
+                            verify=False  # Disable SSL verification
+                        )
+                        return response
+                    except:
+                        pass
+            
+            print(f"    Request error: {error_msg[:100]}")
             raise
 
     def calculate_relevance_score(self, title: str, content: str) -> tuple:
@@ -278,7 +384,8 @@ class CustomArticleCollector:
                 if keyword.lower() in ['luxury', 'jewellery', 'fine jewellery', 'craftsmanship']:
                     score += 4.0
                 # Primary jewelry terms
-                elif keyword.lower() in ['jewelry', 'diamond', 'engagement ring', 'wedding ring']:
+                elif keyword.lower() in ['jewelry', 'diamond', 'engagement ring', 'wedding ring', 'Lab grown diamonds',
+                                         'Diamond price', 'Gold price']:
                     score += 3.0
                 # Jewelry pieces and materials
                 elif keyword.lower() in ['necklace', 'bracelet', 'earrings', 'pendant', 'brooch',
@@ -310,60 +417,105 @@ class CustomArticleCollector:
         return score, found_keywords
     
     def try_rss_feed(self, publication: str, feed_url: str) -> List[ArticleCandidate]:
-        """Try to fetch articles from RSS feed"""
+        """Try to fetch articles from a single RSS feed"""
         candidates = []
         
         if not feed_url:
             return candidates
             
         try:
-            response = self.make_request(feed_url, timeout=10)
+            # Special handling for premium/paywalled sites
+            is_premium = any(domain in feed_url for domain in ['downjones.io', 'wsj.com', 'nytimes.com'])
             
-            if response.status_code == 200:
-                feed = feedparser.parse(response.content)
-                
-                for entry in feed.entries[:20]:
-                    try:
-                        if hasattr(entry, 'published_parsed') and entry.published_parsed:
-                            pub_date = datetime(*entry.published_parsed[:6])
-                        else:
-                            pub_date = datetime.now()
-                        
-                        # Skip articles older than 14 days (bi-weekly collection)
-                        if (datetime.now() - pub_date).days > 14:
-                            continue
-                        
-                        title = entry.get('title', '').strip()
-                        summary = entry.get('summary', '').strip()
-                        url = entry.get('link', '').strip()
-                        
-                        if not title or not url:
-                            continue
-                        
-                        score, keywords = self.calculate_relevance_score(title, summary)
-                        
-                        if score >= 1.0:
-                            candidate = ArticleCandidate(
-                                title=title,
-                                url=url,
-                                publication=publication,
-                                published_date=pub_date,
-                                summary=summary,
-                                relevance_score=score,
-                                keywords_found=keywords
-                            )
-                            candidates.append(candidate)
-                            
-                    except Exception as e:
+            if is_premium and self.scraper_type == 'curl-cffi':
+                # Use curl-cffi with special headers for premium sites
+                response = self.scraper.get(
+                    feed_url,
+                    timeout=15,
+                    impersonate="chrome110",
+                    headers={
+                        'User-Agent': self.get_random_user_agent(),
+                        'Accept': 'application/rss+xml, application/xml, text/xml, */*',
+                        'Accept-Language': 'en-US,en;q=0.9',
+                    }
+                )
+            else:
+                response = self.make_request(feed_url, timeout=10)
+            
+            if response.status_code != 200:
+                return candidates
+            
+            # Parse RSS feed
+            feed = feedparser.parse(response.content)
+            
+            # Check if feed is valid
+            if not hasattr(feed, 'entries') or len(feed.entries) == 0:
+                return candidates
+            
+            for entry in feed.entries[:20]:
+                try:
+                    if hasattr(entry, 'published_parsed') and entry.published_parsed:
+                        pub_date = datetime(*entry.published_parsed[:6])
+                    else:
+                        pub_date = datetime.now()
+                    
+                    # Skip articles older than 14 days (bi-weekly collection)
+                    if (datetime.now() - pub_date).days > 14:
                         continue
-                
-                if candidates:
-                    print(f"  RSS: Found {len(candidates)} articles")
-                
+                    
+                    title = entry.get('title', '').strip()
+                    summary = entry.get('summary', '').strip()
+                    url = entry.get('link', '').strip()
+                    
+                    if not title or not url:
+                        continue
+                    
+                    score, keywords = self.calculate_relevance_score(title, summary)
+                    
+                    if score >= 1.0:
+                        candidate = ArticleCandidate(
+                            title=title,
+                            url=url,
+                            publication=publication,
+                            published_date=pub_date,
+                            summary=summary,
+                            relevance_score=score,
+                            keywords_found=keywords
+                        )
+                        candidates.append(candidate)
+                        
+                except Exception as e:
+                    continue
+            
         except Exception as e:
-            print(f"  RSS error: {str(e)}")
+            # Silent fail for individual feeds
+            pass
         
         return candidates
+    
+    def try_multiple_rss_feeds(self, publication: str, feed_urls: List[str]) -> List[ArticleCandidate]:
+        """Try to fetch articles from multiple RSS feeds"""
+        all_candidates = []
+        
+        if not feed_urls:
+            return all_candidates
+        
+        successful_feeds = 0
+        feed_count = len(feed_urls)
+        
+        for idx, feed_url in enumerate(feed_urls, 1):
+            candidates = self.try_rss_feed(publication, feed_url)
+            
+            if candidates:
+                successful_feeds += 1
+                all_candidates.extend(candidates)
+        
+        if all_candidates:
+            print(f"  RSS: Found {len(all_candidates)} articles from {successful_feeds}/{feed_count} feeds")
+        elif feed_count > 0:
+            print(f"  RSS: No articles found from any of {feed_count} feeds")
+        
+        return all_candidates
     
     def is_relevant_url(self, url: str) -> bool:
         """Enhanced URL filtering - must contain at least 1 luxury keyword"""
@@ -458,7 +610,7 @@ class CustomArticleCollector:
             # Try multiple decoding strategies for problematic sitemaps
             xml_content = None
             
-            # Strategy 1: Use response.text (auto-decodes gzip)
+            # Strategy 1: Use response.text (auto-decodes)
             try:
                 xml_content = response.text
                 root = ET.fromstring(xml_content)
@@ -493,7 +645,7 @@ class CustomArticleCollector:
             
             # If all strategies failed
             if xml_content is None:
-                print(f"  Sitemap error: Cannot parse XML with any encoding method")
+                print(f"  Sitemap error: Cannot parse XML")
                 return candidates
             
             urls = []
@@ -551,23 +703,58 @@ class CustomArticleCollector:
                 print(f"  Sitemap: Found {len(candidates)} articles")
             
         except Exception as e:
-            print(f"  Sitemap error: {str(e)}")
+            print(f"  Sitemap error: {str(e)[:100]}")
         
         return candidates
     
     def collect_from_source(self, publication: str, source_info: dict) -> List[ArticleCandidate]:
+        """Collect articles with proper fallback: sitemap → RSS"""
         all_candidates = []
+        sitemap_tried = False
+        sitemap_succeeded = False
         
         # Method 1: Try sitemap FIRST (priority)
         if source_info.get('sitemap_url'):
-            sitemap_candidates = self.fetch_sitemap_articles(publication, source_info['sitemap_url'])
-            all_candidates.extend(sitemap_candidates)
+            sitemap_tried = True
+            try:
+                sitemap_candidates = self.fetch_sitemap_articles(publication, source_info['sitemap_url'])
+                if sitemap_candidates:
+                    all_candidates.extend(sitemap_candidates)
+                    sitemap_succeeded = True
+                else:
+                    print(f"  Sitemap yielded 0 articles")
+            except Exception as e:
+                error_msg = str(e)
+                if 'SSL' in error_msg or 'ssl' in error_msg.lower():
+                    print(f"  Sitemap failed (SSL error)")
+                else:
+                    print(f"  Sitemap failed: {error_msg[:60]}")
         
-        # Method 2: RSS fallback ONLY if sitemap didn't yield enough
-        if len(all_candidates) < 3 and source_info.get('rss_feed'):
-            rss_candidates = self.try_rss_feed(publication, source_info['rss_feed'])
-            all_candidates.extend(rss_candidates)
+        # Method 2: Try RSS feeds as fallback
+        # Conditions: sitemap didn't run, failed, or didn't yield enough
+        should_try_rss = (
+            not sitemap_tried or                    # No sitemap configured
+            not sitemap_succeeded or                # Sitemap failed completely
+            len(all_candidates) < 3                 # Sitemap didn't yield enough
+        )
         
+        if should_try_rss and source_info.get('rss_feeds'):
+            if sitemap_tried and len(all_candidates) > 0:
+                print(f"  Sitemap yielded only {len(all_candidates)} - trying RSS for more...")
+            elif sitemap_tried:
+                print(f"  Falling back to RSS feeds...")
+            
+            try:
+                rss_candidates = self.try_multiple_rss_feeds(publication, source_info['rss_feeds'])
+                all_candidates.extend(rss_candidates)
+            except Exception as e:
+                error_msg = str(e)
+                if 'SSL' in error_msg or 'ssl' in error_msg.lower():
+                    print(f"  ⚠️  RSS also failed (SSL blocking)")
+                else:
+                    print(f"  RSS error: {error_msg[:100]}")
+        
+        # Remove duplicates
         unique_candidates = []
         seen_urls = set()
         for candidate in all_candidates:
@@ -579,7 +766,7 @@ class CustomArticleCollector:
     
     def extract_full_content(self, candidate: ArticleCandidate) -> ArticleCandidate:
         try:
-            # Download HTML using CloudScraper
+            # Download HTML using curl-cffi
             response = self.make_request(candidate.url, timeout=20)
             
             if response.status_code != 200:
@@ -606,10 +793,8 @@ class CustomArticleCollector:
             candidate.relevance_score = full_score
             candidate.keywords_found = full_keywords
 
-            ### Using extract_author from AgentSumm.py ###
-             # Extract author using AgentSumm's better function
+            # Extract author using AgentSumm's better function
             candidate.author = extract_author(article, article.text)
-
             
             if article.meta_description and len(article.meta_description) > len(candidate.summary):
                 candidate.summary = article.meta_description
@@ -630,12 +815,14 @@ class CustomArticleCollector:
                 print(f"  Error: HTTP 429 Rate Limited - {candidate.publication}")
             elif 'timeout' in error_msg.lower():
                 print(f"  Error: Timeout - {candidate.publication}")
+            elif 'SSL' in error_msg or 'ssl' in error_msg.lower():
+                print(f"  Error: SSL blocking - {candidate.publication}")
             else:
                 print(f"  Error: {error_msg[:60]} - {candidate.publication}")
             return None
     
     def collect_top_3_per_publication(self, sources_subset: List[str] = None) -> List[ArticleCandidate]:
-        """Collect exactly top 3 articles from each publication - guaranteed 3 per source"""
+        """Collect exactly top 3 articles from each publication"""
         print("Bi-Weekly Article Collection (Top 3 per Publication)")
         print("=" * 60)
         
@@ -650,11 +837,10 @@ class CustomArticleCollector:
                 
             print(f"{publication}:")
             self.requests_per_source = 0
+            source_info = self.target_sources[publication]
             
-            candidates = self.collect_from_source(
-                publication,
-                self.target_sources[publication]
-            )
+            # Initial collection attempt
+            candidates = self.collect_from_source(publication, source_info)
             
             if not candidates:
                 print(f"  No candidates found\n")
@@ -663,31 +849,56 @@ class CustomArticleCollector:
             
             candidates.sort(key=lambda x: x.relevance_score, reverse=True)
             
-            # Process candidates until we get 3 articles (regardless of relevance score)
+            # Extract full content and collect articles
             publication_articles = []
-            max_tries = min(len(candidates), 20)  # Try up to 20 candidates to get 3 articles
+            max_tries = min(len(candidates), 20)
             
             for candidate in candidates[:max_tries]:
                 if len(publication_articles) >= 3:
                     break
                 
-                # Extract content - now returns article regardless of score
                 enhanced = self.extract_full_content(candidate)
-                if enhanced:  # Only fails if download/parsing fails, not relevance
+                if enhanced:
                     publication_articles.append(enhanced)
                 
                 time.sleep(random.uniform(1, 2))
             
-            # Sort by relevance and take top 3 (or whatever we got)
+            # If we didn't get 3 articles, try RSS as additional fallback
+            if len(publication_articles) < 3 and source_info.get('rss_feeds'):
+                print(f"  Only collected {len(publication_articles)} articles - trying RSS for more...")
+                
+                try:
+                    rss_candidates = self.try_multiple_rss_feeds(publication, source_info['rss_feeds'])
+                    
+                    # Remove candidates we already tried
+                    tried_urls = {c.url for c in candidates}
+                    new_rss_candidates = [c for c in rss_candidates if c.url not in tried_urls]
+                    
+                    if new_rss_candidates:
+                        print(f"  Found {len(new_rss_candidates)} new RSS candidates to try...")
+                        new_rss_candidates.sort(key=lambda x: x.relevance_score, reverse=True)
+                        
+                        # Try to extract from new RSS candidates
+                        for candidate in new_rss_candidates[:10]:
+                            if len(publication_articles) >= 3:
+                                break
+                            
+                            enhanced = self.extract_full_content(candidate)
+                            if enhanced:
+                                publication_articles.append(enhanced)
+                            
+                            time.sleep(random.uniform(1, 2))
+                except Exception as e:
+                    print(f"  RSS fallback error: {str(e)[:60]}")
+            
             publication_articles.sort(key=lambda x: x.relevance_score, reverse=True)
             final_3 = publication_articles[:3]
             
-            # Show relevance scores to see quality
             if final_3:
                 scores = [f"{a.relevance_score:.1f}" for a in final_3]
                 print(f"  Collected: {len(final_3)} article(s) [scores: {', '.join(scores)}]\n")
             else:
-                print(f"  Collected: 0 articles (all downloads failed)\n")
+                print(f"  Collected: 0 articles\n")
             
             all_articles.extend(final_3)
             
@@ -786,7 +997,6 @@ def main():
     except (ValueError, KeyboardInterrupt):
         sources_subset = None
     
-    # Always run bi-weekly mode
     articles = collector.collect_top_3_per_publication(sources_subset=sources_subset)
     
     report = collector.generate_collection_report(articles)
