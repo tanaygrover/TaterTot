@@ -1,145 +1,192 @@
 /**
- * Rate Limiting Service
- * Prevents multiple simultaneous pipeline runs and enforces cooldown periods
+ * Rate Limit Service
+ * Manages pipeline execution rate limiting with cooldown periods
  */
 
 class RateLimitService {
   constructor() {
+    this.COOLDOWN_MINUTES = 30; // 30 minute cooldown between runs
     this.STORAGE_KEY = 'pipeline_rate_limit';
-    this.COOLDOWN_MINUTES = 15; // Minimum time between runs
   }
 
   /**
-   * Check if pipeline can be run
-   * @returns {Object} { canRun: boolean, reason: string, nextAvailableTime: Date }
+   * Get current rate limit state from localStorage
    */
-  canRunPipeline() {
-    const lastRunData = this.getLastRunData();
+  getState() {
+    const stored = localStorage.getItem(this.STORAGE_KEY);
+    if (!stored) return null;
     
-    if (!lastRunData) {
-      return { canRun: true, reason: null, nextAvailableTime: null };
-    }
-
-    const { timestamp, status } = lastRunData;
-    const lastRunTime = new Date(timestamp);
-    const now = new Date();
-    const minutesSinceLastRun = (now - lastRunTime) / (1000 * 60);
-
-    // Check if a run is currently in progress
-    if (status === 'running') {
-      const runningFor = Math.floor(minutesSinceLastRun);
-      
-      return {
-        canRun: false,
-        reason: `Pipeline is currently running (${runningFor} min). Please wait for it to complete.`,
-        nextAvailableTime: null
-      };
-    }
-
-    // Check cooldown period
-    if (minutesSinceLastRun < this.COOLDOWN_MINUTES) {
-      const remainingMinutes = Math.ceil(this.COOLDOWN_MINUTES - minutesSinceLastRun);
-      const nextAvailable = new Date(lastRunTime.getTime() + this.COOLDOWN_MINUTES * 60 * 1000);
-      
-      return {
-        canRun: false,
-        reason: `Please wait ${remainingMinutes} more minute(s) before running again. Last run was ${Math.floor(minutesSinceLastRun)} minutes ago.`,
-        nextAvailableTime: nextAvailable
-      };
-    }
-
-    return { canRun: true, reason: null, nextAvailableTime: null };
-  }
-
-  /**
-   * Record that pipeline has started
-   */
-  recordPipelineStart() {
-    const data = {
-      timestamp: new Date().toISOString(),
-      status: 'running'
-    };
-    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(data));
-  }
-
-  /**
-   * Record that pipeline has completed
-   */
-  recordPipelineComplete() {
-    const data = {
-      timestamp: new Date().toISOString(),
-      status: 'completed'
-    };
-    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(data));
-  }
-
-  /**
-   * Clear running status (used when detecting stuck runs)
-   */
-  clearRunningStatus() {
-    const data = {
-      timestamp: new Date().toISOString(),
-      status: 'cleared'
-    };
-    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(data));
-  }
-
-  /**
-   * Get last run data from storage
-   */
-  getLastRunData() {
     try {
-      const data = localStorage.getItem(this.STORAGE_KEY);
-      return data ? JSON.parse(data) : null;
+      return JSON.parse(stored);
     } catch (error) {
-      console.error('Error reading rate limit data:', error);
+      console.error('Error parsing rate limit state:', error);
       return null;
     }
   }
 
   /**
-   * Get time until next available run
+   * Save rate limit state to localStorage
    */
-  getTimeUntilNextRun() {
-    const { canRun, nextAvailableTime } = this.canRunPipeline();
-    
-    if (canRun) {
-      return 0;
+  saveState(state) {
+    try {
+      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(state));
+    } catch (error) {
+      console.error('Error saving rate limit state:', error);
     }
-
-    if (!nextAvailableTime) {
-      return 0;
-    }
-
-    const now = new Date();
-    const milliseconds = nextAvailableTime - now;
-    return Math.max(0, Math.ceil(milliseconds / (1000 * 60))); // Return minutes
   }
 
   /**
-   * Format remaining time for display
+   * Record that a pipeline run has started
+   */
+  recordPipelineStart() {
+    const now = Date.now();
+    this.saveState({
+      lastRunStart: now,
+      isRunning: true,
+      lastRunComplete: null
+    });
+    console.log('Pipeline start recorded at', new Date(now));
+  }
+
+  /**
+   * Record that a pipeline run has completed
+   */
+  recordPipelineComplete() {
+    const state = this.getState();
+    if (!state) return;
+
+    const now = Date.now();
+    this.saveState({
+      lastRunStart: state.lastRunStart,
+      isRunning: false,
+      lastRunComplete: now
+    });
+    console.log('Pipeline completion recorded at', new Date(now));
+  }
+
+  /**
+   * Check if pipeline can be run (not in cooldown)
+   */
+  canRunPipeline() {
+    const state = this.getState();
+    
+    // No previous runs - can run
+    if (!state) {
+      return {
+        canRun: true,
+        reason: 'No previous runs',
+        nextAvailableTime: null
+      };
+    }
+
+    const now = Date.now();
+
+    // Check if currently running
+    if (state.isRunning) {
+      return {
+        canRun: false,
+        reason: 'Pipeline is currently running',
+        nextAvailableTime: null
+      };
+    }
+
+    // Check cooldown period
+    const lastRelevantTime = state.lastRunComplete || state.lastRunStart;
+    if (!lastRelevantTime) {
+      return {
+        canRun: true,
+        reason: 'No valid previous run time',
+        nextAvailableTime: null
+      };
+    }
+
+    const cooldownMs = this.COOLDOWN_MINUTES * 60 * 1000;
+    const timeSinceLastRun = now - lastRelevantTime;
+    const timeRemaining = cooldownMs - timeSinceLastRun;
+
+    if (timeRemaining > 0) {
+      // Still in cooldown
+      const nextAvailable = new Date(lastRelevantTime + cooldownMs);
+      const minutesRemaining = Math.ceil(timeRemaining / 60000);
+      
+      return {
+        canRun: false,
+        reason: `Please wait ${minutesRemaining} more minute${minutesRemaining !== 1 ? 's' : ''} before running again`,
+        nextAvailableTime: nextAvailable,
+        timeRemainingMs: timeRemaining
+      };
+    }
+
+    // Cooldown period has passed
+    return {
+      canRun: true,
+      reason: 'Cooldown period completed',
+      nextAvailableTime: null
+    };
+  }
+
+  /**
+   * Format remaining time as human-readable string
    */
   formatRemainingTime() {
-    const minutes = this.getTimeUntilNextRun();
+    const check = this.canRunPipeline();
     
-    if (minutes === 0) {
+    if (check.canRun) {
       return 'Available now';
     }
 
-    if (minutes === 1) {
-      return '1 minute';
+    if (!check.timeRemainingMs) {
+      return 'Calculating...';
     }
 
-    return `${minutes} minutes`;
+    const minutes = Math.floor(check.timeRemainingMs / 60000);
+    const seconds = Math.floor((check.timeRemainingMs % 60000) / 1000);
+
+    if (minutes > 0) {
+      return `${minutes}m ${seconds}s`;
+    } else {
+      return `${seconds}s`;
+    }
   }
 
   /**
-   * Reset rate limit (admin only)
+   * Manually clear the running state (for error recovery)
    */
-  reset() {
+  manualClearRunning() {
+    const state = this.getState();
+    if (state && state.isRunning) {
+      this.saveState({
+        ...state,
+        isRunning: false,
+        lastRunComplete: Date.now()
+      });
+      console.log('Manually cleared running state');
+    }
+  }
+
+  /**
+   * Clear all rate limit data (for testing/debugging)
+   */
+  clearAll() {
     localStorage.removeItem(this.STORAGE_KEY);
-    console.log('Rate limit reset');
+    console.log('Rate limit data cleared');
+  }
+
+  /**
+   * Get debug info
+   */
+  getDebugInfo() {
+    const state = this.getState();
+    const check = this.canRunPipeline();
+    
+    return {
+      state,
+      check,
+      currentTime: new Date().toISOString(),
+      cooldownMinutes: this.COOLDOWN_MINUTES
+    };
   }
 }
 
+// Export singleton instance
 export default new RateLimitService();
