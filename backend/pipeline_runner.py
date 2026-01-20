@@ -20,7 +20,7 @@ except ImportError as e:
 # Import PDF generator
 PDF_AVAILABLE = False
 try:
-    from PDFGenerator import BiweeklyRoundupPDF
+    from PDFGenerator import weeklyRoundupPDF
     PDF_AVAILABLE = True
     print("✅ PDF Generator loaded successfully")
 except ImportError as e:
@@ -160,7 +160,7 @@ class PipelineRunner:
         
         # Temporary JSON (needed by PDFGenerator)
         json_file = f"output/temp_{date_str}.json"
-        pdf_file = f"output/biweekly_roundup_{date_str}.pdf"
+        pdf_file = f"output/weekly_roundup_{date_str}.pdf"
         
         # Save temporary JSON for PDF generator
         import json
@@ -170,7 +170,7 @@ class PipelineRunner:
         # Generate PDF
         try:
             print("📝 Generating PDF...")
-            pdf_gen = BiweeklyRoundupPDF()
+            pdf_gen = weeklyRoundupPDF()
             pdf_path = pdf_gen.generate_pdf(json_file, pdf_file)
             
             # Clean up temporary JSON
